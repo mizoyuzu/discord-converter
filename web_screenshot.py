@@ -53,16 +53,21 @@ class WebScreenshot(commands.Cog):
 
     async def cog_load(self):
         """Cog読み込み時にPlaywrightブラウザを起動"""
-        self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(
-            args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-blink-features=AutomationControlled',
-            ],
-            ignore_default_args=['--enable-automation'],
-        )
-        print("Playwright browser launched")
+        try:
+            self._playwright = await async_playwright().start()
+            self._browser = await self._playwright.chromium.launch(
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-blink-features=AutomationControlled',
+                ],
+                ignore_default_args=['--enable-automation'],
+            )
+            print("Playwright browser launched")
+        except Exception as e:
+            print(f"Playwrightブラウザの起動に失敗しました（スクリーンショット機能は無効）: {e}")
+            self._playwright = None
+            self._browser = None
 
     async def cog_unload(self):
         self.bot.tree.remove_command(self.ctx_menu.name, type=self.ctx_menu.type)
@@ -107,6 +112,8 @@ class WebScreenshot(commands.Cog):
         URLのローリングスクリーンショットを撮影。
         ページ全体をSLICE_HEIGHTごとに分割してJPEG画像リストとして返す。
         """
+        if self._browser is None:
+            raise RuntimeError("Playwrightブラウザが起動していません。Dockerイメージを再ビルドしてください。")
         context = await self._browser.new_context(
             viewport={'width': VIEWPORT_WIDTH, 'height': 900},
             device_scale_factor=1.5,

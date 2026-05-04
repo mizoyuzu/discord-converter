@@ -8,8 +8,8 @@ import sys
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr.reconfigure(line_buffering=True)
 
-# Tokenは環境変数から取得します
-TOKEN = os.getenv("DISCORD_TOKEN")
+# Tokenは環境変数から取得します（前後の空白を除去）
+TOKEN = (os.getenv("DISCORD_TOKEN") or "").strip()
 
 # インテントの設定（メッセージ内容の取得権限が必要）
 intents = discord.Intents.default()
@@ -30,12 +30,21 @@ async def on_ready():
 async def main():
     async with bot:
         # Extensions を読み込む
-        await bot.load_extension("file_viewer")
-        await bot.load_extension("web_screenshot")
-        await bot.start(TOKEN)
+        for ext in ("file_viewer", "web_screenshot"):
+            try:
+                await bot.load_extension(ext)
+                print(f'拡張機能を読み込みました: {ext}')
+            except Exception as e:
+                print(f'拡張機能の読み込みに失敗しました ({ext}): {e}')
+        try:
+            await bot.start(TOKEN)
+        except discord.LoginFailure:
+            print("エラー: Discordトークンが無効です。DISCORD_TOKEN を確認してください。")
+            sys.exit(1)
 
 if __name__ == "__main__":
     if not TOKEN:
         print("エラー: 環境変数 DISCORD_TOKEN が設定されていません。")
+        sys.exit(1)
     else:
         asyncio.run(main())
