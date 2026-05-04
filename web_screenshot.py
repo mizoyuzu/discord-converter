@@ -75,14 +75,14 @@ class WebScreenshot(commands.Cog):
         return URL_PATTERN.findall(text)
 
     async def _wait_for_ready(self, page: "Page"):
-        """ネットワークアイドルまで待機し、タイムアウト時は無視する。"""
+        """networkidleまで待機し、タイムアウト時は描画済みとして続行する。"""
         try:
             await page.wait_for_load_state("networkidle", timeout=15000)
         except (PlaywrightTimeoutError, asyncio.TimeoutError):
             return
 
     async def _detect_cloudflare_error(self, page: "Page") -> bool:
-        """Cloudflareのエラーページ表示有無を判定する。"""
+        """cf-error-details/footerのDOMやタイトルのcloudflare/attention等で判定する。"""
         selectors = [
             "#cf-error-details",
             "#cf-error-footer",
