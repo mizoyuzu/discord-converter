@@ -5,7 +5,7 @@ import io
 import discord
 from discord.ext import commands
 from discord import app_commands
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
 from PIL import Image
 
 # URL抽出用の正規表現
@@ -77,7 +77,7 @@ class WebScreenshot(commands.Cog):
     async def _wait_for_ready(self, page: "Page"):
         try:
             await page.wait_for_load_state("networkidle", timeout=15000)
-        except Exception:
+        except (PlaywrightTimeoutError, asyncio.TimeoutError):
             return
 
     async def _detect_cloudflare_error(self, page: "Page") -> bool:
@@ -113,6 +113,7 @@ class WebScreenshot(commands.Cog):
         page = await context.new_page()
 
         try:
+            # Cloudflare等のボット判定を避けて正しい描画を取得するための対策
             await page.add_init_script(
                 "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
             )
