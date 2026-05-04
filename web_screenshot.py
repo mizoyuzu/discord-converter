@@ -34,6 +34,10 @@ NAVIGATION_TIMEOUT_MS = 45000
 POST_LOAD_WAIT_SEC = 2
 
 
+class CloudflareBlockedError(RuntimeError):
+    """Cloudflareのブロック/エラーページが表示されたことを示す。"""
+
+
 class WebScreenshot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -75,14 +79,14 @@ class WebScreenshot(commands.Cog):
         return URL_PATTERN.findall(text)
 
     async def _wait_for_ready(self, page: "Page"):
-        """networkidleまで待機し、タイムアウト時は描画済みとして続行する。"""
+        """domcontentloaded後にnetworkidle待機し、長期通信でも続行する。"""
         try:
             await page.wait_for_load_state("networkidle", timeout=15000)
         except (PlaywrightTimeoutError, asyncio.TimeoutError):
             return
 
     async def _detect_cloudflare_error(self, page: "Page") -> bool:
-        """cf-error-details/footerのDOMやタイトルのcloudflare/attention等で判定する。"""
+        """cf-error系DOMやタイトルのキーワードから検知し、Trueを返す。"""
         selectors = [
             "#cf-error-details",
             "#cf-error-footer",
@@ -125,7 +129,9 @@ class WebScreenshot(commands.Cog):
             await asyncio.sleep(POST_LOAD_WAIT_SEC)
 
             if await self._detect_cloudflare_error(page):
-                raise RuntimeError("Cloudflareのエラーページが表示されました。")
+                raise CloudflareBlockedError(
+                    "Cloudflareのエラーページが表示されました。URLがブロックされている可能性があります。"
+                )
 
             # ページ全体の高さを取得
             full_height = await page.evaluate(
