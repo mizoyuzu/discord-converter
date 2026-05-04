@@ -21,6 +21,17 @@ VIEWPORT_WIDTH = 1280
 MAX_PAGE_HEIGHT = 16000
 # 1メッセージあたりの最大ファイル数（Discord制限）
 FILES_PER_MESSAGE = 10
+# 代表的なデスクトップChromeのユーザーエージェント
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/123.0.0.0 Safari/537.36"
+)
+EXTRA_HEADERS = {
+    "Accept-Language": "ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7",
+}
+NAVIGATION_TIMEOUT_MS = 45000
+POST_LOAD_WAIT_SEC = 2
 
 
 class WebScreenshot(commands.Cog):
@@ -40,7 +51,12 @@ class WebScreenshot(commands.Cog):
         """Cog読み込み時にPlaywrightブラウザを起動"""
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(
-            args=['--no-sandbox', '--disable-setuid-sandbox']
+            args=[
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-blink-features=AutomationControlled',
+            ],
+            ignore_default_args=['--enable-automation'],
         )
         print("Playwright browser launched")
 
@@ -58,6 +74,27 @@ class WebScreenshot(commands.Cog):
             return []
         return URL_PATTERN.findall(text)
 
+    async def _wait_for_ready(self, page: "Page"):
+        try:
+            await page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            return
+
+    async def _detect_cloudflare_error(self, page: "Page") -> bool:
+        selectors = [
+            "#cf-error-details",
+            "#cf-error-footer",
+            ".cf-error-details",
+            ".cf-error-footer",
+        ]
+        for selector in selectors:
+            if await page.query_selector(selector):
+                return True
+        title = (await page.title()).lower()
+        return "cloudflare" in title and (
+            "error" in title or "attention" in title or "just a moment" in title
+        )
+
     async def take_rolling_screenshot(self, url: str) -> list[bytes]:
         """
         URLのローリングスクリーンショットを撮影。
@@ -67,14 +104,25 @@ class WebScreenshot(commands.Cog):
             viewport={'width': VIEWPORT_WIDTH, 'height': 900},
             device_scale_factor=1.5,
             locale='ja-JP',
+            timezone_id='Asia/Tokyo',
+            user_agent=USER_AGENT,
+            extra_http_headers=EXTRA_HEADERS,
+            java_script_enabled=True,
+            ignore_https_errors=True,
         )
         page = await context.new_page()
 
         try:
+            await page.add_init_script(
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+            )
             # ページ読み込み（最大30秒）
-            await page.goto(url, wait_until='networkidle', timeout=30000)
-            # 追加の描画待機
-            await asyncio.sleep(1)
+            await page.goto(url, wait_until='domcontentloaded', timeout=NAVIGATION_TIMEOUT_MS)
+            await self._wait_for_ready(page)
+            await asyncio.sleep(POST_LOAD_WAIT_SEC)
+
+            if await self._detect_cloudflare_error(page):
+                raise RuntimeError("Cloudflareのエラーページが表示されました。")
 
             # ページ全体の高さを取得
             full_height = await page.evaluate(

@@ -28,10 +28,11 @@ async def on_ready():
         print(f'スラッシュコマンドの同期に失敗: {e}')
 
 async def main():
-    # Extensions を読み込む
-    await bot.load_extension("file_viewer")
-    await bot.load_extension("web_screenshot")
-    await bot.start(TOKEN)
+    async with bot:
+        # Extensions を読み込む
+        await bot.load_extension("file_viewer")
+        await bot.load_extension("web_screenshot")
+        await bot.start(TOKEN)
 
 if __name__ == "__main__":
     if not TOKEN:
