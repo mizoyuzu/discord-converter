@@ -79,10 +79,11 @@ class WebScreenshot(commands.Cog):
         return URL_PATTERN.findall(text)
 
     async def _wait_for_ready(self, page: "Page"):
-        """domcontentloaded後にnetworkidle待機し、長期通信のタイムアウトは無視する。"""
+        """domcontentloaded後に呼び出し、networkidle待機のタイムアウトは続行する。"""
         try:
             await page.wait_for_load_state("networkidle", timeout=15000)
-        except (PlaywrightTimeoutError, asyncio.TimeoutError):
+        except (PlaywrightTimeoutError, asyncio.TimeoutError) as exc:
+            print(f"networkidle待機タイムアウト: {exc}")
             return
 
     async def _detect_cloudflare_error(self, page: "Page") -> bool:
