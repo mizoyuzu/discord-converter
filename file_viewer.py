@@ -42,7 +42,7 @@ class FileViewer(commands.Cog):
             pdf_io = io.BytesIO()
             await attachment.save(pdf_io)
             images = await loop.run_in_executor(
-                None, pdf2image.convert_from_bytes, pdf_io.read()
+                None, pdf2image.convert_from_bytes, pdf_io.getvalue()
             )
         
         # Officeファイルの場合
