@@ -79,7 +79,7 @@ class WebScreenshot(commands.Cog):
         return URL_PATTERN.findall(text)
 
     async def _wait_for_ready(self, page: "Page"):
-        """domcontentloaded後に呼び出し、networkidle待機のタイムアウトは続行する。"""
+        """DOMContentLoaded後に描画が落ち着くまでnetworkidle待機し、長期通信はタイムアウト後に続行する。"""
         try:
             await page.wait_for_load_state("networkidle", timeout=15000)
         except (PlaywrightTimeoutError, asyncio.TimeoutError) as exc:
